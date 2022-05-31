@@ -4,6 +4,7 @@ extern crate cursive_hexview;
 mod cpu;
 use cpu::Cpu;
 
+use cursive::theme::{BaseColor::*, BorderStyle, Color::*, Palette, PaletteColor::*, Theme};
 use cursive::traits::Nameable;
 use cursive::view::SizeConstraint;
 use cursive::views::{
@@ -44,7 +45,6 @@ impl View for BufferView {
     fn draw(&self, printer: &Printer) {
         // Print the latest up to (size) lines of the buffer
         for (i, line) in self.buffer.iter().rev().take(printer.size.y).enumerate() {
-            //print at x=0,
             printer.print((0, printer.size.y - 1 - i), line);
         }
     }
@@ -57,38 +57,59 @@ struct AppState {
 
 fn main() {
     //main structs
-    let cur = cursive::default();
+    let mut cur = cursive::default();
+    cur.set_fps(15);
     let mut our_runner = cur.into_runner();
+    //TODO: im pretty sure this is doing literally nothing lmfao
 
     //app state and our cpu
     let app_state = AppState { is_running: true };
     let mut our_cpu = Cpu::new();
 
+    //our TUI needs an app state so we can update our cpu accordingly
+    our_runner.set_user_data(app_state);
+
+    /*
+        Background => Dark(Blue)
+        Shadow => Dark(Black)
+        View => Dark(White)
+        Primary => Dark(Black)
+        Secondary => Dark(Blue)
+        Tertiary => Light(White)
+        TitlePrimary => Dark(Red)
+        TitleSecondary => Dark(Yellow)
+        Highlight => Dark(Red)
+        HighlightInactive => Dark(Blue)
+        HighlightText => Dark(White)
+    */
+
+    let mut our_palette = Palette::default();
+    our_palette.set_color("Background", Dark(Yellow));
+    our_palette.set_color("View", Dark(Black));
+    our_palette.set_color("Primary", Dark(White));
+    our_palette.set_color("TitlePrimary", Dark(Cyan));
+
+    let our_theme = Theme {
+        shadow: false,
+        borders: BorderStyle::Simple,
+        palette: our_palette,
+    };
+    our_runner.set_theme(our_theme);
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
     let log_view = ResizedView::new(
-        SizeConstraint::Fixed(75),
-        SizeConstraint::Fixed(30),
+        SizeConstraint::Full,
+        SizeConstraint::Full,
         BufferView::new(75).with_name("buf"),
     );
 
-    let cpu_state = ResizedView::new(
-        SizeConstraint::Fixed(35),
-        SizeConstraint::Fixed(20),
-        DummyView,
-    );
+    let cpu_state = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
 
-    let ppu_view = ResizedView::new(
-        SizeConstraint::Fixed(35),
-        SizeConstraint::Fixed(20),
-        DummyView,
-    );
-    let apu_view = ResizedView::new(
-        SizeConstraint::Fixed(75),
-        SizeConstraint::Fixed(8),
-        DummyView,
-    );
+    let ppu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
+    let apu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
 
     let vram_view = ResizedView::new(
-        SizeConstraint::Fixed(75),
+        SizeConstraint::Full,
         SizeConstraint::Fixed(15),
         ScrollView::new(
             HexView::new_from_iter(our_cpu.get_data().iter())
@@ -97,7 +118,7 @@ fn main() {
         ),
     );
     let rom_view = ResizedView::new(
-        SizeConstraint::Fixed(75),
+        SizeConstraint::Full,
         SizeConstraint::Fixed(15),
         ScrollView::new(
             HexView::new_from_iter(our_cpu.get_data().iter())
@@ -105,10 +126,6 @@ fn main() {
                 .with_name("rom_memory"),
         ),
     );
-
-    //
-    //our TUI needs an app state so we can update our cpu accordingly
-    our_runner.set_user_data(app_state);
 
     //add views to layer and add layer to screen
     let top_level = LinearLayout::horizontal()
@@ -132,6 +149,7 @@ fn main() {
             .child(top_level)
             .child(bottom_level),
     );
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     //add global keybinds
 
@@ -148,6 +166,7 @@ fn main() {
         });
     });
 
+    //manual event loop
     loop {
         let mut step_running = false;
         //update our cpu state if running
