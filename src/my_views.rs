@@ -71,9 +71,9 @@ impl UltraHexaView {
         };
     }
 
-    pub fn new_from_iter<B: Borrow<u8>, I: IntoIterator<Item = B>>(d: I) -> Self {
+    pub fn new_from_iter<'a, I: IntoIterator<Item = &'a u8>>(d: I) -> Self {
         return UltraHexaView {
-            data: d.into_iter().map(|v| *v.borrow()).collect(),
+            data: d.into_iter().map(|v| *v).collect(),
             base_line: 0,
             index: 0,
             num_lines: 0,
@@ -81,23 +81,21 @@ impl UltraHexaView {
         };
     }
     pub fn new_from_iter_with_watch<
-        U: Borrow<usize>,
-        B: Borrow<u8>,
-        I: IntoIterator<Item = B>,
-        W: IntoIterator<Item = U>,
+        'a,
+        I: IntoIterator<Item = &'a u8>,
+        W: IntoIterator<Item = usize>,
     >(
         d: I,
         watchpoints: W,
     ) -> Self {
         return UltraHexaView {
-            data: d.into_iter().map(|v| *v.borrow()).collect(),
+            data: d.into_iter().map(|v| *v).collect(),
             base_line: 0,
             index: 0,
             num_lines: 0,
-            watchpoints: watchpoints.into_iter().map(|v| *v.borrow()).collect(),
+            watchpoints: watchpoints.into_iter().collect(),
         };
     }
-
     pub fn set_data(&mut self, dat: &mut Vec<u8>) {
         self.data = dat.to_vec();
     }
