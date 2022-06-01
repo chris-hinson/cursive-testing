@@ -1,55 +1,23 @@
 extern crate cursive;
 extern crate cursive_hexview;
+extern crate sdl2;
 
 mod cpu;
 use cpu::Cpu;
 
-use cursive::theme::{BaseColor::*, BorderStyle, Color::*, Palette, PaletteColor::*, Theme};
+mod my_views;
+use my_views::BufferView;
+
+use cursive::theme::{BaseColor::*, BorderStyle, Color::*, Palette, Theme};
 use cursive::traits::Nameable;
 use cursive::view::SizeConstraint;
-use cursive::views::{
-    DebugView, Dialog, DummyView, LinearLayout, ResizedView, ScrollView, TextContent, TextView,
-};
-use cursive::{Printer, Vec2, View};
+use cursive::views::{Dialog, DummyView, LinearLayout, ResizedView, ScrollView};
 use cursive_hexview::{DisplayState, HexView};
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// Let's define a buffer view, that shows the last lines from a stream.
-//NOTE: this was stolen from the cursive logs.rs example, but i made it not async bc i dont like async
-struct BufferView {
-    // We'll use a ring buffer
-    buffer: Vec<String>,
-}
-
-impl BufferView {
-    // Creates a new view with the given buffer size
-    fn new(size: usize) -> Self {
-        let mut buffer = Vec::new();
-        buffer.resize(size, String::new());
-        BufferView { buffer }
-    }
-
-    //appends a series of lines to the buffer
-    fn update(&mut self, v: &mut Vec<String>) {
-        self.buffer.append(v);
-    }
-}
-
-impl View for BufferView {
-    //i literally do not know what this function does and im too afraid to ask
-    fn layout(&mut self, _: Vec2) {
-        // Before drawing, we'll want to update the buffer
-        //self.update();
-    }
-
-    fn draw(&self, printer: &Printer) {
-        // Print the latest up to (size) lines of the buffer
-        for (i, line) in self.buffer.iter().rev().take(printer.size.y).enumerate() {
-            printer.print((0, printer.size.y - 1 - i), line);
-        }
-    }
-}
-///////////////////////////////////////////////////////////////////////////////////////////////////
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::Color;
+use std::time::Duration;
 
 struct AppState {
     is_running: bool,
@@ -60,7 +28,6 @@ fn main() {
     let mut cur = cursive::default();
     cur.set_fps(15);
     let mut our_runner = cur.into_runner();
-    //TODO: im pretty sure this is doing literally nothing lmfao
 
     //app state and our cpu
     let app_state = AppState { is_running: true };
@@ -106,7 +73,7 @@ fn main() {
     let cpu_state = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
 
     let ppu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
-    let apu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
+    let apu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Fixed(7), DummyView);
 
     let vram_view = ResizedView::new(
         SizeConstraint::Full,
@@ -166,6 +133,26 @@ fn main() {
         });
     });
 
+    //sdl2 stuff now
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    let window = video_subsystem
+        .window("rust-sdl2 demo", 800, 600)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas().build().unwrap();
+
+    canvas.set_draw_color(Color::RGB(0, 255, 255));
+    canvas.clear();
+    canvas.present();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut i = 0;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     //manual event loop
     loop {
         let mut step_running = false;
@@ -194,9 +181,29 @@ fn main() {
             our_runner.call_on_name("buf", |v: &mut BufferView| v.update(&mut vec![log_line]));
         }
 
-        //refresh our gui
+        //refresh our tui
         //NOTE: set_autorefresh() might do the same thing?
         let _event_received = our_runner.step();
         our_runner.refresh();
+
+        //sdl2 drawing
+        if step_running {
+            i = (i + 1) % 255;
+            canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
+            canvas.clear();
+            for event in event_pump.poll_iter() {
+                match event {
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => panic!("lol"),
+                    _ => {}
+                }
+            }
+            // The rest of the game loop goes here...
+
+            canvas.present();
+        }
     }
 }
