@@ -1,21 +1,21 @@
 use rand::Rng;
 pub struct Cpu {
-    pub PC: usize,
-    data: Vec<u8>,
+    pub pc: usize,
+    pub data: Vec<u8>,
     pub rom: Vec<u8>,
 }
 
 impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
-            PC: 0,
+            pc: 0,
             data: vec![0; 4096],
             rom: vec![0; 4096],
         }
     }
 
     pub fn step(&mut self) {
-        self.PC += 1;
+        self.pc += 1;
 
         let mut rng = rand::thread_rng();
         //update some values in vram

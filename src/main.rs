@@ -7,17 +7,17 @@ use cpu::Cpu;
 
 mod my_views;
 use my_views::BufferView;
+use my_views::UltraHexaView;
 
 use cursive::theme::{BaseColor::*, BorderStyle, Color::*, Palette, Theme};
 use cursive::traits::Nameable;
 use cursive::view::SizeConstraint;
-use cursive::views::{Dialog, DummyView, LinearLayout, ResizedView, ScrollView};
-use cursive_hexview::{DisplayState, HexView};
-
+use cursive::views::{Dialog, DummyView, LinearLayout, ResizedView};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
-use std::time::Duration;
+
+use rand::Rng;
 
 struct AppState {
     is_running: bool,
@@ -75,7 +75,7 @@ fn main() {
     let ppu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Full, DummyView);
     let apu_view = ResizedView::new(SizeConstraint::Full, SizeConstraint::Fixed(7), DummyView);
 
-    let vram_view = ResizedView::new(
+    /*let vram_view = ResizedView::new(
         SizeConstraint::Full,
         SizeConstraint::Fixed(15),
         ScrollView::new(
@@ -92,6 +92,24 @@ fn main() {
                 .display_state(DisplayState::Enabled)
                 .with_name("rom_memory"),
         ),
+    );*/
+
+    let ram_view = ResizedView::new(
+        SizeConstraint::Full,
+        SizeConstraint::Fixed(15),
+        UltraHexaView::new_from_iter_with_watch(&our_cpu.data, vec![1, 2, 3, 4])
+            .with_name("ram_view"),
+    );
+    let rom_view = ResizedView::new(
+        SizeConstraint::Full,
+        SizeConstraint::Fixed(15),
+        UltraHexaView::new_from_iter_with_watch(&our_cpu.rom, vec![1, 2, 3, 4])
+            .with_name("rom_view"),
+    );
+    let chr_view = ResizedView::new(
+        SizeConstraint::Full,
+        SizeConstraint::Fixed(15),
+        UltraHexaView::new_from_iter(&our_cpu.rom).with_name("chr_vieww"),
     );
 
     //add views to layer and add layer to screen
@@ -108,8 +126,9 @@ fn main() {
         );
 
     let bottom_level = LinearLayout::horizontal()
-        .child(Dialog::around(vram_view).title("VRAM"))
-        .child(Dialog::around(rom_view).title("ROM"));
+        .child(Dialog::around(ram_view).title("VRAM"))
+        .child(Dialog::around(rom_view).title("ROM"))
+        .child(Dialog::around(chr_view).title("CHR"));
 
     our_runner.add_layer(
         LinearLayout::vertical()
@@ -155,6 +174,12 @@ fn main() {
 
     //manual event loop
     loop {
+        //really we want to seperate our main loop into two things.
+        //check our sdl event pump
+        //check our app state through the tui's transient state
+        //THEN if we are running, update our data (tui views and sdl data)
+        //always update our tui and canvas, even if no new data was written
+
         let mut step_running = false;
         //update our cpu state if running
         our_runner.with_user_data(|s: &mut AppState| {
@@ -168,16 +193,25 @@ fn main() {
             //step our cpu
             our_cpu.step();
 
-            //update all our views
-            our_runner.call_on_name("vram_memory", |view: &mut cursive_hexview::HexView| {
-                view.set_data(our_cpu.get_data().iter());
+            //generate some test data
+            let mut r = rand::thread_rng();
+            let mut test_data: Vec<(usize, u8)> = Vec::new();
+
+            for _i in 0..10 {
+                let index = r.gen_range(0..our_cpu.data.len());
+                let val = r.gen_range(0..u8::MAX);
+                test_data.push((index, val));
+            }
+
+            our_runner.call_on_name("rom_view", |view: &mut UltraHexaView| {
+                view.update_data(&test_data);
             });
 
-            our_runner.call_on_name("rom_memory", |view: &mut cursive_hexview::HexView| {
-                view.set_data(our_cpu.rom.iter());
+            our_runner.call_on_name("ram_view", |view: &mut UltraHexaView| {
+                view.update_data(&test_data);
             });
 
-            let log_line = format!("{:075X}", our_cpu.PC).to_owned();
+            let log_line = format!("{:075X}", our_cpu.pc).to_owned();
             our_runner.call_on_name("buf", |v: &mut BufferView| v.update(&mut vec![log_line]));
         }
 
